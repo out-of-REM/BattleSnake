@@ -10,3 +10,5 @@ Artificial Intelligence Lab 2: Battlesnake
 - Rupak Biswas
 - PJ Tisler
 - (Replace with your name and school email)
+
+```Server Link will go here```
