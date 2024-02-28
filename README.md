@@ -14,4 +14,5 @@ Artificial Intelligence Lab 2: Battlesnake
 | PJ Tisler | |
 | Matthew Lane | ml2162@msstate.edu |
 
-```Server Link will go here```
+```Server Setup if you need to copy for testing purposes:``` 
+<a href = "https://codesandbox.io/p/devbox/operation-snake-yf6mq5"> here </a>
