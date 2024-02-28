@@ -8,7 +8,7 @@ Artificial Intelligence Lab 2: Battlesnake
 
 | Name | School E-Mail |
 | - | - |
-| Jeffrey Goerke | |
+| Jeffrey Goerke |jg2912@msstate.edu |
 | Mason Fisher | mcf325@msstate.edu |
 | Rupak Biswas | rb2336@msstate.edu |
 | PJ Tisler | |
