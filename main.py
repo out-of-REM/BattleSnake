@@ -9,9 +9,9 @@
 #
 # For more info see docs.battlesnake.com
 
-import random
 import typing
 import sys
+import math
 
 
 # info is called when you create your Battlesnake on play.battlesnake.com
@@ -37,6 +37,11 @@ def start(game_state: typing.Dict):
 # end is called when your Battlesnake finishes a game
 def end(game_state: typing.Dict):
     print("GAME OVER\n")
+
+
+# distance helper function
+def distance(x1, y1, x2, y2):
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
 # move is called on every turn and returns your next move
@@ -92,11 +97,32 @@ def move(game_state: typing.Dict) -> typing.Dict:
                       }: No safe moves detected! Moving down")
         return {"move": "down"}
 
-    # Choose a random move from the safe ones
-    next_move = random.choice(safe_moves)
+    # Step 4 - Move towards food instead of random,
+    # to regain health and survive longer
+    food = game_state['board']['food']
 
-    # TODO: Step 4 - Move towards food instead of random, to regain health and survive longer
-    # food = game_state['board']['food']
+    food_dist = []
+
+    for f in food:
+        f_dist = distance(my_head['x'], my_head['y'], f['x'], f['y'])
+        food_dist.append((f, f_dist))
+
+    def sort_dist(t):
+        return t[1]
+
+    food_dist.sort(key=sort_dist)
+
+    safe_dist = []
+
+    for safe_move in safe_moves:
+        sx = surrounding_cells[safe_move]['x']
+        sy = surrounding_cells[safe_move]['y']
+        s_dist = distance(sx, sy, food_dist[0][0]['x'], food_dist[0][0]['y'])
+        safe_dist.append((safe_move, s_dist))
+
+    safe_dist.sort(key=sort_dist)
+
+    next_move = safe_dist[0][0]
 
     print(f"MOVE {game_state['turn']}: {next_move}")
     return {"move": next_move}
