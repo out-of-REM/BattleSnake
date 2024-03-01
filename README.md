@@ -21,5 +21,6 @@ Artificial Intelligence Lab 2: Battlesnake
 ## Local Host Instructions:
 * run exe/linux binary using this command .
   * /battlesnake play -W 11 -H 11 --name "snake1" --url http://127.0.0.1:8000 --name "snake2" --url http://127.0.0.1:8001 --browser
-* run  python3 simple.py --port 8001
-* run python3 main.py --port 8000
+* run
+  *  python3 simple.py --port 8001
+  * python3 main.py --port 8000
