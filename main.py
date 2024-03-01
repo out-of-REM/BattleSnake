@@ -93,8 +93,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']
-                      }: No safe moves detected! Moving down")
+        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
         return {"move": "down"}
 
     # Step 4 - Move towards food instead of random,
