@@ -44,11 +44,7 @@ def distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
-# move is called on every turn and returns your next move
-# Valid moves are "up", "down", "left", or "right"
-# See https://docs.battlesnake.com/api/example-move for available data
-def move(game_state: typing.Dict) -> typing.Dict:
-
+def get_safe_moves(game_state):
     is_move_safe = {"up": True, "down": True, "left": True, "right": True}
 
     # Store head position in variable to save code
@@ -93,12 +89,31 @@ def move(game_state: typing.Dict) -> typing.Dict:
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
-        return {"move": "down"}
+        print(f"MOVE {game_state['turn']
+                      }: No safe moves detected! Moving down")
+        return ["down"]
+
+    return safe_moves
+
+
+# move is called on every turn and returns your next move
+# Valid moves are "up", "down", "left", or "right"
+# See https://docs.battlesnake.com/api/example-move for available data
+def move(game_state: typing.Dict) -> typing.Dict:
+    safe_moves = get_safe_moves(game_state)
 
     # Step 4 - Move towards food instead of random,
     # to regain health and survive longer
     food = game_state['board']['food']
+
+    # Temporarily duplicating these variables as this system will be removed
+    my_head = game_state["you"]["body"][0]  # Coordinates of your head
+    surrounding_cells = {
+        'left': {'x': my_head['x'] - 1, 'y': my_head['y']},
+        'right': {'x': my_head['x'] + 1, 'y': my_head['y']},
+        'up': {'x': my_head['x'], 'y': my_head['y'] + 1},
+        'down': {'x': my_head['x'], 'y': my_head['y'] - 1}
+    }
 
     food_dist = []
 
