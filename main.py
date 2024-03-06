@@ -13,7 +13,7 @@ import typing
 import sys
 import math
 import random
-
+import copy
 
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
@@ -99,14 +99,61 @@ def get_safe_moves(game_state, maximizing):
 
 
 def apply_move(game_state, move, maximizing):
-    # TODO: Actually do something useful here
-    return game_state.copy()
+    new_game_state = copy.deepcopy(game_state)
+    snake = new_game_state['you']  # Assuming this applies to your snake
+    
+    # Determine the new head position based on the move
+    dx, dy = 0, 0
+    if move == 'left': dx = -1
+    elif move == 'right': dx = 1
+    elif move == 'up': dy = -1
+    elif move == 'down': dy = 1
+
+    new_head = {'x': snake['body'][0]['x'] + dx, 'y': snake['body'][0]['y'] + dy}
+
+    # Add the new head to the snake's body
+    snake['body'].insert(0, new_head)
+
+    # Check if the move results in eating food
+    if new_head in new_game_state['board']['food']:
+        new_game_state['board']['food'].remove(new_head)  # Remove eaten food
+        snake['health'] = 100  # Assume replenished health (or adjust according to game rules)
+    else:
+        snake['body'].pop()  # Remove the tail if no food is eaten
+
+    return new_game_state
 
 
-def get_state_value(game_state, maximizing):
-    # TODO: Actually do something useful here
-    return random.randrange(-10000, 10000)
+def get_state_value(game_state):
+    value = 0
+    my_snake = game_state['you']
+    my_head = my_snake['body'][0]
+    my_length = len(my_snake['body'])
 
+    # Base value on health - less aggressive approach but necessary for survival
+    value += my_snake['health']
+
+    # Aggressiveness factor
+    aggression_multiplier = 10  # Adjust this value to tweak aggressiveness
+
+    for snake in game_state['board']['snakes']:
+        if snake['id'] != my_snake['id']:
+            opponent_head = snake['body'][0]
+            opponent_length = len(snake['body'])
+            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
+
+            # Prioritize getting closer to smaller snakes
+            if my_length > opponent_length:
+                # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
+                value += (10 - distance_to_opponent) * aggression_multiplier
+            
+            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
+            if my_length <= opponent_length:
+                value -= (10 - distance_to_opponent) * aggression_multiplier
+
+    # Consider other strategic factors, such as controlling the center of the board or escape routes
+
+    return value
 
 class GameStateNode():
     def __init__(self, game_state, maximizing=True, move=None):
@@ -122,6 +169,28 @@ class GameStateNode():
                                         self.maximizing)
             yield GameStateNode(new_game_state, not self.maximizing, safe_move)
 
+    def is_terminal(game_state):
+        my_snake = game_state['you']
+        head = my_snake['body'][0]
+
+        # Check for collision with walls
+        board_width = game_state['board']['width']
+        board_height = game_state['board']['height']
+        if head['x'] < 0 or head['x'] >= board_width or head['y'] < 0 or head['y'] >= board_height:
+            return True  # The snake has collided with a wall
+
+        # Check for self-collision
+        if head in my_snake['body'][1:]:
+            return True  # The snake has collided with itself
+
+        # Check for collisions with other snakes
+        for snake in game_state['board']['snakes']:
+            if snake['id'] != my_snake['id'] and head in snake['body']:
+                return True  # The snake has collided with another snake
+
+        # Additional terminal conditions can be checked here, e.g., winning conditions
+
+        return False  # If none of the terminal conditions are met, the game is not in a terminal state
 
 def minimax(game_state_node, depth):
     # print("\t"*(3-depth), game_state_node.maximizing, depth,
@@ -148,6 +217,34 @@ def minimax(game_state_node, depth):
                 best_move = child.move
         return value, best_move
 
+def alphabeta(node, depth, alpha, beta, maximizingPlayer):
+    if depth == 0 or node.is_terminal():
+        return get_state_value(node.game_state, maximizingPlayer), node.move
+
+    if maximizingPlayer:
+        value = float('-inf')
+        best_move = None
+        for child in node.get_children():
+            child_value, _ = alphabeta(child, depth-1, alpha, beta, False)
+            if child_value > value:
+                value = child_value
+                best_move = child.move
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break  # Beta cut-off
+        return value, best_move
+    else:
+        value = float('inf')
+        best_move = None
+        for child in node.get_children():
+            child_value, _ = alphabeta(child, depth-1, alpha, beta, True)
+            if child_value < value:
+                value = child_value
+                best_move = child.move
+            beta = min(beta, value)
+            if beta <= alpha:
+                break  # Alpha cut-off
+        return value, best_move
 
 # move is called on every turn and returns your next move
 # Valid moves are "up", "down", "left", or "right"
@@ -157,7 +254,10 @@ def move(game_state: typing.Dict) -> typing.Dict:
 
     origin = GameStateNode(game_state)
     depth = 3
-    next_move_value, next_move = minimax(origin, depth)
+
+    alpha = float('inf')
+    beta = float('inf')
+    next_move_value, next_move = alphabeta(origin,depth,alpha,beta,True)
 
     print(f"MOVE {game_state['turn']}: {next_move}")
 
