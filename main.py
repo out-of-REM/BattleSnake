@@ -12,6 +12,7 @@
 import typing
 import sys
 import math
+import random
 
 
 # info is called when you create your Battlesnake on play.battlesnake.com
@@ -44,11 +45,8 @@ def distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
-# move is called on every turn and returns your next move
-# Valid moves are "up", "down", "left", or "right"
-# See https://docs.battlesnake.com/api/example-move for available data
-def move(game_state: typing.Dict) -> typing.Dict:
-
+def get_safe_moves(game_state, maximizing):
+    # TODO: Change snake depending on maximizing value
     is_move_safe = {"up": True, "down": True, "left": True, "right": True}
 
     # Store head position in variable to save code
@@ -93,12 +91,92 @@ def move(game_state: typing.Dict) -> typing.Dict:
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
-        return {"move": "down"}
+        print(f"MOVE {game_state['turn']
+                      }: No safe moves detected! Moving down")
+        return ["down"]
+
+    return safe_moves
+
+
+def apply_move(game_state, move, maximizing):
+    # TODO: Actually do something useful here
+    return game_state.copy()
+
+
+def get_state_value(game_state, maximizing):
+    # TODO: Actually do something useful here
+    return random.randrange(-10000, 10000)
+
+
+class GameStateNode():
+    def __init__(self, game_state, maximizing=True, move=None):
+        self.maximizing = maximizing
+        self.move = move
+        self.safe_moves = get_safe_moves(game_state, maximizing)
+        self.value = get_state_value(game_state, maximizing)
+        self.game_state = game_state
+
+    def getChildren(self):
+        for safe_move in self.safe_moves:
+            new_game_state = apply_move(self.game_state, safe_move,
+                                        self.maximizing)
+            yield GameStateNode(new_game_state, not self.maximizing, safe_move)
+
+
+def minimax(game_state_node, depth):
+    # print("\t"*(3-depth), game_state_node.maximizing, depth,
+    #      game_state_node.value, game_state_node.move)
+    children = game_state_node.getChildren()
+    if (depth == 0) or (not children):
+        return game_state_node.value, game_state_node.move
+    if game_state_node.maximizing:
+        value = float('-inf')
+        best_move = None
+        for child in children:
+            child_value = minimax(child, depth - 1)[0]
+            if child_value > value:
+                value = child_value
+                best_move = child.move
+        return value, best_move
+    else:
+        value = float('inf')
+        best_move = None
+        for child in children:
+            child_value = minimax(child, depth - 1)[0]
+            if child_value < value:
+                value = child_value
+                best_move = child.move
+        return value, best_move
+
+
+# move is called on every turn and returns your next move
+# Valid moves are "up", "down", "left", or "right"
+# See https://docs.battlesnake.com/api/example-move for available data
+def move(game_state: typing.Dict) -> typing.Dict:
+    safe_moves = get_safe_moves(game_state, True)
+
+    origin = GameStateNode(game_state)
+    depth = 3
+    next_move_value, next_move = minimax(origin, depth)
+
+    print(f"MOVE {game_state['turn']}: {next_move}")
+
+    return {"move": next_move}
+
+    # TODO: Integrate the below inaccessable code as part of get_state_value
 
     # Step 4 - Move towards food instead of random,
     # to regain health and survive longer
     food = game_state['board']['food']
+
+    # Temporarily duplicating these variables as this system will be removed
+    my_head = game_state["you"]["body"][0]  # Coordinates of your head
+    surrounding_cells = {
+        'left': {'x': my_head['x'] - 1, 'y': my_head['y']},
+        'right': {'x': my_head['x'] + 1, 'y': my_head['y']},
+        'up': {'x': my_head['x'], 'y': my_head['y'] + 1},
+        'down': {'x': my_head['x'], 'y': my_head['y'] - 1}
+    }
 
     food_dist = []
 
@@ -122,9 +200,6 @@ def move(game_state: typing.Dict) -> typing.Dict:
     safe_dist.sort(key=sort_dist)
 
     next_move = safe_dist[0][0]
-
-    print(f"MOVE {game_state['turn']}: {next_move}")
-    return {"move": next_move}
 
 
 # Start server when `python main.py` is run
