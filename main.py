@@ -179,7 +179,7 @@ def get_state_value(game_state,maximizing):
                 value -= (10 - distance_to_opponent) * aggression_multiplier
 
     #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
-    #points it in the direction of the food.
+    #points it in the direction of the food. There is a issue that needs to be addressed due to looping.
     return value
 
 class GameStateNode():
