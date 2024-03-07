@@ -15,6 +15,7 @@ import math
 import random
 import copy
 
+move_history = []
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
 # TIP: If you open your Battlesnake URL in a browser you should see this data
@@ -105,36 +106,37 @@ def apply_move(game_state, move):
 
     # Calculate new head position
     head = my_snake['body'][0]
-    new_head = {'x': head['x'], 'y': head['y']}
+    
     if move == 'up':
-        new_head['y'] -= 1
+        head['y'] -= 1
     elif move == 'down':
-        new_head['y'] += 1
+        head['y'] += 1
     elif move == 'left':
-        new_head['x'] -= 1
+        head['x'] -= 1
     elif move == 'right':
-        new_head['x'] += 1
+        head['x'] += 1
 
     # Check for collisions with walls
-    if not (0 <= new_head['x'] < game_state['board']['width'] and 0 <= new_head['y'] < game_state['board']['height']):
+    if not (0 <= head['x'] < new_game_state['board']['width'] and 0 <= head['y'] < new_game_state['board']['height']):
         return None  # Collision with wall
 
     # Check for self-collision
-    if new_head in my_snake['body']:
+    if head in my_snake['body']:
         return None  # Self-collision
 
     # Check for collisions with other snakes
-    for snake in game_state['board']['snakes']:
-        if new_head in snake['body'][:-1]:  # Ignore tail unless it's your own snake
+    for snake in new_game_state['board']['snakes']:
+        if head in snake['body'][:-1]:  # Ignore tail unless it's your own snake
             return None  # Collision with another snake
 
     # Simulate eating food
-    if new_head in game_state['board']['food']:
+    if head in new_game_state['board']['food']:
         # Snake grows; don't remove tail in this move
-        my_snake['body'].insert(0, new_head)
+        my_snake['body'].insert(0, head)
+        new_game_state['board']['food'] = [food for food in new_game_state['board']['food'] if not (food['x'] == head['x'] and food['y'] == head['y'])]
     else:
         # Move snake forward
-        my_snake['body'].insert(0, new_head)
+        my_snake['body'].insert(0, head)
         my_snake['body'].pop()
 
     return new_game_state
@@ -273,30 +275,50 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             if beta <= alpha:
                 break  # Alpha cut-off
         return value, best_move
+def detect_loop(history):
+    # Simple example: check if the last N moves are repeating
+    N = 12  # Size of pattern to check for; adjust based on observed loops
+    if len(history) >= N * 2:
+        return history[-N:] == history[-(N*2):-N]
+    return False
 
+def break_loop(safe_moves):
+    # Choose a move to break the loop, maybe the least used move,
+    # or random if safe_moves is not empty
+    return safe_moves[random.randint(0, len(safe_moves)-1)] if safe_moves else 'up'
 # move is called on every turn and returns your next move
 # Valid moves are "up", "down", "left", or "right"
 # See https://docs.battlesnake.com/api/example-move for available data
 def move(game_state: typing.Dict) -> typing.Dict:
+    global move_history
+
     safe_moves = get_safe_moves(game_state, True)
 
     if not safe_moves:
         return {"move":"up"}
 
-    origin = GameStateNode(game_state)
-    depth = 3
+    if detect_loop(move_history):
+        print("break loop")
+        next_move = break_loop(safe_moves)
+    else:
+        origin = GameStateNode(game_state)
+        depth = 25
 
-    alpha = float('-inf')
-    beta = float('inf')
-    next_move_value, next_move = alphabeta(origin,depth,alpha,beta,True)
+        alpha = float('-inf')
+        beta = float('inf')
+        next_move_value, next_move = alphabeta(origin,depth,alpha,beta,True)
 
     if next_move not in safe_moves:
         next_move = safe_moves[0]
 
+    move_history.append(next_move)
+
+    if len(move_history) > 100:
+        move_history.pop(0)
+
     print(f"MOVE {game_state['turn']}: {next_move}")
 
     return {"move": next_move}
-
     # TODO: Integrate the below inaccessable code as part of get_state_value
 
     # Step 4 - Move towards food instead of random,
