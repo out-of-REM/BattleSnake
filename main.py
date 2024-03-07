@@ -91,40 +91,58 @@ def get_safe_moves(game_state, maximizing):
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']
-                      }: No safe moves detected! Moving down")
+        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
         return ["down"]
 
     return safe_moves
 
 
-def apply_move(game_state, move, maximizing):
+def apply_move(game_state, move):
+    # Create a deep copy of the game state to simulate the move without affecting the original state
     new_game_state = copy.deepcopy(game_state)
-    snake = new_game_state['you']  # Assuming this applies to your snake
+    my_snake = new_game_state['you']
     
-    # Determine the new head position based on the move
-    dx, dy = 0, 0
-    if move == 'left': dx = -1
-    elif move == 'right': dx = 1
-    elif move == 'up': dy = -1
-    elif move == 'down': dy = 1
 
-    new_head = {'x': snake['body'][0]['x'] + dx, 'y': snake['body'][0]['y'] + dy}
+    # Calculate new head position
+    head = my_snake['body'][0]
+    new_head = {'x': head['x'], 'y': head['y']}
+    if move == 'up':
+        new_head['y'] -= 1
+    elif move == 'down':
+        new_head['y'] += 1
+    elif move == 'left':
+        new_head['x'] -= 1
+    elif move == 'right':
+        new_head['x'] += 1
 
-    # Add the new head to the snake's body
-    snake['body'].insert(0, new_head)
+    # Check for collisions with walls
+    if not (0 <= new_head['x'] < game_state['board']['width'] and 0 <= new_head['y'] < game_state['board']['height']):
+        return None  # Collision with wall
 
-    # Check if the move results in eating food
-    if new_head in new_game_state['board']['food']:
-        new_game_state['board']['food'].remove(new_head)  # Remove eaten food
-        snake['health'] = 100  # Assume replenished health (or adjust according to game rules)
+    # Check for self-collision
+    if new_head in my_snake['body']:
+        return None  # Self-collision
+
+    # Check for collisions with other snakes
+    for snake in game_state['board']['snakes']:
+        if new_head in snake['body'][:-1]:  # Ignore tail unless it's your own snake
+            return None  # Collision with another snake
+
+    # Simulate eating food
+    if new_head in game_state['board']['food']:
+        # Snake grows; don't remove tail in this move
+        my_snake['body'].insert(0, new_head)
     else:
-        snake['body'].pop()  # Remove the tail if no food is eaten
+        # Move snake forward
+        my_snake['body'].insert(0, new_head)
+        my_snake['body'].pop()
 
     return new_game_state
 
 
-def get_state_value(game_state):
+
+
+def get_state_value(game_state,maximizing):
     value = 0
     my_snake = game_state['you']
     my_head = my_snake['body'][0]
@@ -133,8 +151,17 @@ def get_state_value(game_state):
     # Base value on health - less aggressive approach but necessary for survival
     value += my_snake['health']
 
+    nearest_food_distance = min([distance(my_head['x'], my_head['y'], food['x'], food['y']) for food in game_state['board']['food']], default=float('inf'))
+    # Decrease value by distance, but consider adding more sophisticated logic here
+    value -= nearest_food_distance * 30 # Adjust weighting as needed
+
+    if nearest_food_distance == 1:
+        value += 1000
+
     # Aggressiveness factor
     aggression_multiplier = 10  # Adjust this value to tweak aggressiveness
+
+  
 
     for snake in game_state['board']['snakes']:
         if snake['id'] != my_snake['id']:
@@ -151,8 +178,8 @@ def get_state_value(game_state):
             if my_length <= opponent_length:
                 value -= (10 - distance_to_opponent) * aggression_multiplier
 
-    # Consider other strategic factors, such as controlling the center of the board or escape routes
-
+    #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
+    #points it in the direction of the food.
     return value
 
 class GameStateNode():
@@ -165,17 +192,18 @@ class GameStateNode():
 
     def getChildren(self):
         for safe_move in self.safe_moves:
-            new_game_state = apply_move(self.game_state, safe_move,
-                                        self.maximizing)
+            new_game_state = apply_move(self.game_state,
+                                        safe_move)
+        if new_game_state is not None:
             yield GameStateNode(new_game_state, not self.maximizing, safe_move)
 
-    def is_terminal(game_state):
-        my_snake = game_state['you']
+    def is_terminal(self):
+        my_snake = self.game_state['you']
         head = my_snake['body'][0]
 
         # Check for collision with walls
-        board_width = game_state['board']['width']
-        board_height = game_state['board']['height']
+        board_width = self.game_state['board']['width']
+        board_height = self.game_state['board']['height']
         if head['x'] < 0 or head['x'] >= board_width or head['y'] < 0 or head['y'] >= board_height:
             return True  # The snake has collided with a wall
 
@@ -184,7 +212,7 @@ class GameStateNode():
             return True  # The snake has collided with itself
 
         # Check for collisions with other snakes
-        for snake in game_state['board']['snakes']:
+        for snake in self.game_state['board']['snakes']:
             if snake['id'] != my_snake['id'] and head in snake['body']:
                 return True  # The snake has collided with another snake
 
@@ -224,7 +252,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     if maximizingPlayer:
         value = float('-inf')
         best_move = None
-        for child in node.get_children():
+        for child in node.getChildren():
             child_value, _ = alphabeta(child, depth-1, alpha, beta, False)
             if child_value > value:
                 value = child_value
@@ -236,7 +264,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     else:
         value = float('inf')
         best_move = None
-        for child in node.get_children():
+        for child in node.getChildren():
             child_value, _ = alphabeta(child, depth-1, alpha, beta, True)
             if child_value < value:
                 value = child_value
@@ -252,12 +280,18 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
 def move(game_state: typing.Dict) -> typing.Dict:
     safe_moves = get_safe_moves(game_state, True)
 
+    if not safe_moves:
+        return {"move":"up"}
+
     origin = GameStateNode(game_state)
     depth = 3
 
-    alpha = float('inf')
+    alpha = float('-inf')
     beta = float('inf')
     next_move_value, next_move = alphabeta(origin,depth,alpha,beta,True)
+
+    if next_move not in safe_moves:
+        next_move = safe_moves[0]
 
     print(f"MOVE {game_state['turn']}: {next_move}")
 
