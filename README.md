@@ -11,7 +11,7 @@ Artificial Intelligence Lab 2: Battlesnake
 | Jeffrey Goerke |jg2912@msstate.edu |
 | Mason Fisher | mcf325@msstate.edu |
 | Rupak Biswas | rb2336@msstate.edu |
-| PJ Tisler | |
+| PJ Tisler |  pft20@msstate.edu |
 | Matthew Lane | ml2162@msstate.edu |
 
 ```Server Setup if you need to copy for testing purposes:``` 
