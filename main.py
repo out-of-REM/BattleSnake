@@ -142,6 +142,117 @@ def apply_move(game_state, move):
     return new_game_state
 
 
+def get_state_value(game_state,maximizing):
+    value = 0
+    my_snake = game_state['you']
+    my_head = my_snake['body'][0]
+    my_length = len(my_snake['body'])
+    food_positions = game_state['board']['food']
+    shortest_path_length = float('inf')
+
+    # Base value on health - less aggressive approach but necessary for survival
+    value += my_snake['health']
+
+    for food in food_positions:
+        path = a_star_pathfinding(my_head,food,game_state)
+        if path:
+                shortest_path_length = min(shortest_path_length, len(path))
+
+    if shortest_path_length != float('inf'):
+        value +=100 - (shortest_path_length * 10)
+
+    aggression_multiplier = 5
+
+    for snake in game_state['board']['snakes']:
+        if snake['id'] != my_snake['id']:
+            opponent_head = snake['body'][0]
+            opponent_length = len(snake['body'])
+            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
+        
+
+            # Prioritize getting closer to smaller snakes
+            if my_length > opponent_length:
+                # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
+                value += (10 - distance_to_opponent) * aggression_multiplier
+            
+            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
+            if my_length <= opponent_length:
+                value -= (10 - distance_to_opponent) * aggression_multiplier
+
+    #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
+    #points it in the direction of the food.
+    return value
+def generate_neighbors(current, game_state):
+    neighbors = []
+    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Up, Down, Left, Right movements
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+    obstacles = []
+
+    # Convert dictionary-based obstacles to tuple-based obstacles if not already done
+    for snake in game_state['board']['snakes']:
+        # Add the body parts of all snakes, including your own, to the obstacles list as tuples
+        obstacles.extend([(part['x'], part['y']) for part in snake['body'][:-1]])
+
+    # Unpack the current position from a tuple
+    cx, cy = current
+
+    for dx, dy in directions:
+        neighbor = (cx + dx, cy + dy)  # Generate neighbor as a tuple
+        
+        # Check if the neighbor is within the board boundaries
+        if 0 <= neighbor[0] < board_width and 0 <= neighbor[1] < board_height:
+            # Check if the neighbor is not an obstacle
+            if neighbor not in obstacles:
+                neighbors.append(neighbor)
+
+    return neighbors
+
+
+def a_star_pathfinding(start, goal, game_state):
+    # Heuristic function (Manhattan distance for a grid)
+    def heuristic(a, b):
+        ax, ay = a
+        bx,by = b
+        return abs(ax-bx) + abs(ay- by)
+    
+    start = (start['x'], start['y'])
+    goal = (goal['x'],goal['y'])
+    
+    # Initialize both the open and closed sets
+    open_set = set([start])
+    came_from = {}  # For path reconstruction
+
+    g_score = {start: 0}  # Cost from start to the current node
+    f_score = {start: heuristic(start, goal)}  # Estimated cost from start to goal through the current node
+
+    while open_set:
+        current = min(open_set, key=lambda pos: f_score.get(pos, float('inf')))
+        
+        if current == goal:
+            # Reconstruct path
+            total_path = [current]
+            while current in came_from:
+                current = came_from[current]
+                total_path.append(current)
+            return total_path[::-1]  # Return reversed path
+        
+        open_set.remove(current)
+        
+        # Generate neighbors (considering Battlesnake rules: no diagonal moves, avoid walls, self, and others)
+        neighbors = generate_neighbors(current, game_state)
+        
+        for neighbor in neighbors:
+            tentative_g_score = g_score[current] + 1  # Assume cost between nodes is 1
+            
+            if tentative_g_score < g_score.get(neighbor, float('inf')):
+                # This path is the best so far
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
+                open_set.add(neighbor)
+    
+    return []  # If there's no path to the goal
 
 
 def get_state_value(game_state,maximizing):
@@ -149,16 +260,22 @@ def get_state_value(game_state,maximizing):
     my_snake = game_state['you']
     my_head = my_snake['body'][0]
     my_length = len(my_snake['body'])
+    food_positions = game_state['board']['food']
+    shortest_path_length = float('inf')
 
     # Base value on health - less aggressive approach but necessary for survival
     value += my_snake['health']
 
-    nearest_food_distance = min([distance(my_head['x'], my_head['y'], food['x'], food['y']) for food in game_state['board']['food']], default=float('inf'))
-    # Decrease value by distance, but consider adding more sophisticated logic here
-    value -= nearest_food_distance * 30 # Adjust weighting as needed
 
-    if nearest_food_distance == 1:
-        value += 1000
+    for food in food_positions:
+        path = a_star_pathfinding(my_head,food,game_state)
+        if path:
+                shortest_path_length = min(shortest_path_length, len(path))
+
+    if shortest_path_length != float('inf'):
+        value +=100 - (shortest_path_length * 10)
+    
+  
 
     # Aggressiveness factor
     aggression_multiplier = 10  # Adjust this value to tweak aggressiveness
@@ -222,30 +339,7 @@ class GameStateNode():
 
         return False  # If none of the terminal conditions are met, the game is not in a terminal state
 
-def minimax(game_state_node, depth):
-    # print("\t"*(3-depth), game_state_node.maximizing, depth,
-    #      game_state_node.value, game_state_node.move)
-    children = game_state_node.getChildren()
-    if (depth == 0) or (not children):
-        return game_state_node.value, game_state_node.move
-    if game_state_node.maximizing:
-        value = float('-inf')
-        best_move = None
-        for child in children:
-            child_value = minimax(child, depth - 1)[0]
-            if child_value > value:
-                value = child_value
-                best_move = child.move
-        return value, best_move
-    else:
-        value = float('inf')
-        best_move = None
-        for child in children:
-            child_value = minimax(child, depth - 1)[0]
-            if child_value < value:
-                value = child_value
-                best_move = child.move
-        return value, best_move
+
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     if depth == 0 or node.is_terminal():
