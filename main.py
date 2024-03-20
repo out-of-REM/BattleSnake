@@ -246,14 +246,27 @@ def get_state_value(game_state, move, maximizing):
             opponent_length = len(snake['body'])
             distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
 
+            opponent_head_zone = [
+                {'x': opponent_head['x'] - 1, 'y': opponent_head['y']},
+                {'x': opponent_head['x'] + 1, 'y': opponent_head['y']},
+                {'x': opponent_head['x'], 'y': opponent_head['y'] + 1},
+                {'x': opponent_head['x'], 'y': opponent_head['y'] - 1}
+            ]
+
             # Prioritize getting closer to smaller snakes
             if my_length > opponent_length:
                 # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
                 value += (10 - distance_to_opponent) * aggression_multiplier
+                # If stepping into opponent head zone while opponent is smaller, increase value
+                if my_head in opponent_head_zone:
+                    value += (my_length - opponent_length) * aggression_multiplier
 
             # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
             if my_length <= opponent_length:
                 value -= (10 - distance_to_opponent) * aggression_multiplier
+                # If stepping into opponent head zone while opponent is smaller, decrease value to almost nothing (near-certain death awaits)
+                if my_head in opponent_head_zone:
+                    value = 1
 
     # TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that
     # points it in the direction of the food.
