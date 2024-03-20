@@ -244,7 +244,8 @@ def get_state_value(game_state, move, maximizing):
         if snake['id'] != my_snake['id']:
             opponent_head = snake['body'][0]
             opponent_length = len(snake['body'])
-            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
+            distance_to_opponent = abs(
+                my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
 
             opponent_head_zone = [
                 {'x': opponent_head['x'] - 1, 'y': opponent_head['y']},
@@ -274,7 +275,6 @@ def get_state_value(game_state, move, maximizing):
         return value
     else:
         return -value
-
 
 class GameStateNode():
     def __init__(self, game_state, value=None, maximizing=True, move=None):
