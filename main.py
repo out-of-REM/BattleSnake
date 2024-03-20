@@ -134,46 +134,6 @@ def apply_move(game_state, move):
 
     return new_game_state
 
-def get_state_value(game_state,maximizing):
-    value = 0
-    my_snake = game_state['you']
-    my_head = my_snake['body'][0]
-    my_length = len(my_snake['body'])
-    food_positions = game_state['board']['food']
-    shortest_path_length = float('inf')
-
-    # Base value on health - less aggressive approach but necessary for survival
-    value += my_snake['health']
-
-    for food in food_positions:
-        path = a_star_pathfinding(my_head,food,game_state)
-        if path:
-                shortest_path_length = min(shortest_path_length, len(path))
-
-    if shortest_path_length != float('inf'):
-        value +=100 - (shortest_path_length * 10)
-
-    aggression_multiplier = 5
-
-    for snake in game_state['board']['snakes']:
-        if snake['id'] != my_snake['id']:
-            opponent_head = snake['body'][0]
-            opponent_length = len(snake['body'])
-            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
-        
-            # Prioritize getting closer to smaller snakes
-            if my_length > opponent_length:
-                # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
-                value += (10 - distance_to_opponent) * aggression_multiplier
-            
-            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
-            if my_length <= opponent_length:
-                value -= (10 - distance_to_opponent) * aggression_multiplier
-
-    #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
-    #points it in the direction of the food.
-    return value
-
 def generate_neighbors(current, game_state):
     neighbors = []
     directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Up, Down, Left, Right movements
