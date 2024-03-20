@@ -92,8 +92,7 @@ def get_safe_moves(game_state, maximizing):
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']
-                      } {maximizing}: No safe moves detected! Moving down")
+        print(f"""MOVE {game_state['turn']} {maximizing}: No safe moves detected! Moving down""")
         return ["down"]
 
     return safe_moves
