@@ -12,13 +12,15 @@
 import typing
 import sys
 import math
-import random
 import copy
+import json
 
-move_history = []
+
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
 # TIP: If you open your Battlesnake URL in a browser you should see this data
+
+
 def info() -> typing.Dict:
     print("INFO")
 
@@ -41,9 +43,14 @@ def end(game_state: typing.Dict):
     print("GAME OVER\n")
 
 
-# distance helper function
-def distance(x1, y1, x2, y2):
-    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+# helper function to get the correct snake
+def get_correct_snake(game_state, maximizing):
+    if maximizing:
+        return game_state['you']
+    else:
+        for snake in game_state['board']['snakes']:
+            if snake['id'] != game_state['you']['id']:
+                return snake
 
 
 def get_safe_moves(game_state, maximizing):
@@ -51,7 +58,8 @@ def get_safe_moves(game_state, maximizing):
     is_move_safe = {"up": True, "down": True, "left": True, "right": True}
 
     # Store head position in variable to save code
-    my_head = game_state["you"]["body"][0]  # Coordinates of your head
+    # Coordinates of your head
+    my_head = get_correct_snake(game_state, maximizing)['body'][0]
 
     # Step 1 - Prevent your Battlesnake from moving out of bounds
     board_width = game_state['board']['width']
@@ -92,99 +100,49 @@ def get_safe_moves(game_state, maximizing):
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
+        print(f"MOVE {game_state['turn']
+                      } {maximizing}: No safe moves detected! Moving down")
         return ["down"]
 
     return safe_moves
 
 
-def apply_move(game_state, move):
+def apply_move(game_state, move, maximizing):
     # Create a deep copy of the game state to simulate the move without affecting the original state
     new_game_state = copy.deepcopy(game_state)
-    my_snake = new_game_state['you']
-    
+    my_snake = get_correct_snake(new_game_state, maximizing)
 
-    # Calculate new head position
-    head = my_snake['body'][0]
-    
+    # Create shorthand for snake head
+    head = my_snake['head']
+
     if move == 'up':
-        head['y'] -= 1
-    elif move == 'down':
         head['y'] += 1
+    elif move == 'down':
+        head['y'] -= 1
     elif move == 'left':
         head['x'] -= 1
     elif move == 'right':
         head['x'] += 1
 
-    # Check for collisions with walls
-    if not (0 <= head['x'] < new_game_state['board']['width'] and 0 <= head['y'] < new_game_state['board']['height']):
-        return None  # Collision with wall
-
-    # Check for self-collision
-    if head in my_snake['body']:
-        return None  # Self-collision
-
-    # Check for collisions with other snakes
-    for snake in new_game_state['board']['snakes']:
-        if head in snake['body'][:-1]:  # Ignore tail unless it's your own snake
-            return None  # Collision with another snake
-
     # Simulate eating food
     if head in new_game_state['board']['food']:
         # Snake grows; don't remove tail in this move
-        my_snake['body'].insert(0, head)
-        new_game_state['board']['food'] = [food for food in new_game_state['board']['food'] if not (food['x'] == head['x'] and food['y'] == head['y'])]
+        my_snake['body'].insert(0, copy.deepcopy(head))
+        new_game_state['board']['food'] = [food for food in new_game_state['board']
+                                           ['food'] if not (food['x'] == head['x'] and food['y'] == head['y'])]
     else:
-        # Move snake forward
-        my_snake['body'].insert(0, head)
+        # Move snake forward by inserting a copy of the new head location
+        my_snake['body'].insert(0, copy.deepcopy(head))
         my_snake['body'].pop()
 
     return new_game_state
 
 
-def get_state_value(game_state,maximizing):
-    value = 0
-    my_snake = game_state['you']
-    my_head = my_snake['body'][0]
-    my_length = len(my_snake['body'])
-    food_positions = game_state['board']['food']
-    shortest_path_length = float('inf')
-
-    # Base value on health - less aggressive approach but necessary for survival
-    value += my_snake['health']
-
-    for food in food_positions:
-        path = a_star_pathfinding(my_head,food,game_state)
-        if path:
-                shortest_path_length = min(shortest_path_length, len(path))
-
-    if shortest_path_length != float('inf'):
-        value +=100 - (shortest_path_length * 10)
-
-    aggression_multiplier = 5
-
-    for snake in game_state['board']['snakes']:
-        if snake['id'] != my_snake['id']:
-            opponent_head = snake['body'][0]
-            opponent_length = len(snake['body'])
-            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
-        
-
-            # Prioritize getting closer to smaller snakes
-            if my_length > opponent_length:
-                # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
-                value += (10 - distance_to_opponent) * aggression_multiplier
-            
-            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
-            if my_length <= opponent_length:
-                value -= (10 - distance_to_opponent) * aggression_multiplier
-
-    #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
-    #points it in the direction of the food.
-    return value
+# helper function for a_star_pathfinding
 def generate_neighbors(current, game_state):
     neighbors = []
-    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Up, Down, Left, Right movements
+    # Up, Down, Left, Right movements
+    directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
     board_width = game_state['board']['width']
     board_height = game_state['board']['height']
     obstacles = []
@@ -192,14 +150,15 @@ def generate_neighbors(current, game_state):
     # Convert dictionary-based obstacles to tuple-based obstacles if not already done
     for snake in game_state['board']['snakes']:
         # Add the body parts of all snakes, including your own, to the obstacles list as tuples
-        obstacles.extend([(part['x'], part['y']) for part in snake['body'][:-1]])
+        obstacles.extend([(part['x'], part['y'])
+                         for part in snake['body'][:-1]])
 
     # Unpack the current position from a tuple
     cx, cy = current
 
     for dx, dy in directions:
         neighbor = (cx + dx, cy + dy)  # Generate neighbor as a tuple
-        
+
         # Check if the neighbor is within the board boundaries
         if 0 <= neighbor[0] < board_width and 0 <= neighbor[1] < board_height:
             # Check if the neighbor is not an obstacle
@@ -209,26 +168,28 @@ def generate_neighbors(current, game_state):
     return neighbors
 
 
+# helper function for get_state_value
 def a_star_pathfinding(start, goal, game_state):
     # Heuristic function (Manhattan distance for a grid)
     def heuristic(a, b):
         ax, ay = a
-        bx,by = b
-        return abs(ax-bx) + abs(ay- by)
-    
+        bx, by = b
+        return abs(ax-bx) + abs(ay - by)
+
     start = (start['x'], start['y'])
-    goal = (goal['x'],goal['y'])
-    
+    goal = (goal['x'], goal['y'])
+
     # Initialize both the open and closed sets
     open_set = set([start])
     came_from = {}  # For path reconstruction
 
     g_score = {start: 0}  # Cost from start to the current node
-    f_score = {start: heuristic(start, goal)}  # Estimated cost from start to goal through the current node
+    # Estimated cost from start to goal through the current node
+    f_score = {start: heuristic(start, goal)}
 
     while open_set:
         current = min(open_set, key=lambda pos: f_score.get(pos, float('inf')))
-        
+
         if current == goal:
             # Reconstruct path
             total_path = [current]
@@ -236,29 +197,44 @@ def a_star_pathfinding(start, goal, game_state):
                 current = came_from[current]
                 total_path.append(current)
             return total_path[::-1]  # Return reversed path
-        
+
         open_set.remove(current)
-        
+
         # Generate neighbors (considering Battlesnake rules: no diagonal moves, avoid walls, self, and others)
         neighbors = generate_neighbors(current, game_state)
-        
+
         for neighbor in neighbors:
-            tentative_g_score = g_score[current] + 1  # Assume cost between nodes is 1
-            
+            tentative_g_score = g_score[current] + \
+                1  # Assume cost between nodes is 1
+
             if tentative_g_score < g_score.get(neighbor, float('inf')):
                 # This path is the best so far
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
+                f_score[neighbor] = g_score[neighbor] + \
+                    heuristic(neighbor, goal)
                 open_set.add(neighbor)
-    
+
     return []  # If there's no path to the goal
 
 
-def get_state_value(game_state,maximizing):
+def get_state_value(game_state, move, maximizing):
     value = 0
-    my_snake = game_state['you']
+    my_snake = copy.deepcopy(get_correct_snake(game_state, maximizing))
     my_head = my_snake['body'][0]
+
+    if move == 'up':
+        my_head['y'] += 1
+    elif move == 'down':
+        my_head['y'] -= 1
+    elif move == 'left':
+        my_head['x'] -= 1
+    elif move == 'right':
+        my_head['x'] += 1
+
+    my_snake['body'].insert(0, copy.deepcopy(my_head))
+    my_snake['body'].pop()
+
     my_length = len(my_snake['body'])
     food_positions = game_state['board']['food']
     shortest_path_length = float('inf')
@@ -266,89 +242,78 @@ def get_state_value(game_state,maximizing):
     # Base value on health - less aggressive approach but necessary for survival
     value += my_snake['health']
 
-
     for food in food_positions:
-        path = a_star_pathfinding(my_head,food,game_state)
+        path = a_star_pathfinding(my_head, food, game_state)
         if path:
-                shortest_path_length = min(shortest_path_length, len(path))
+            shortest_path_length = min(shortest_path_length, len(path))
 
     if shortest_path_length != float('inf'):
-        value +=100 - (shortest_path_length * 10)
-    
-  
+        value += 100 - (shortest_path_length * 10)
 
-    # Aggressiveness factor
-    aggression_multiplier = 10  # Adjust this value to tweak aggressiveness
-
-  
+    aggression_multiplier = 5
 
     for snake in game_state['board']['snakes']:
         if snake['id'] != my_snake['id']:
             opponent_head = snake['body'][0]
             opponent_length = len(snake['body'])
-            distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
+            distance_to_opponent = abs(
+                my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
 
             # Prioritize getting closer to smaller snakes
             if my_length > opponent_length:
                 # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
                 value += (10 - distance_to_opponent) * aggression_multiplier
-            
+
             # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
             if my_length <= opponent_length:
                 value -= (10 - distance_to_opponent) * aggression_multiplier
 
-    #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
-    #points it in the direction of the food. There is a issue that needs to be addressed due to looping.
-    return value
+    # TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that
+    # points it in the direction of the food.
+    if maximizing:
+        return value
+    else:
+        return -value
+
 
 class GameStateNode():
-    def __init__(self, game_state, maximizing=True, move=None):
+    def __init__(self, game_state, value=None, maximizing=True, move=None):
         self.maximizing = maximizing
         self.move = move
-        self.safe_moves = get_safe_moves(game_state, maximizing)
-        self.value = get_state_value(game_state, maximizing)
+        self.value = value
         self.game_state = game_state
+        self.safe_moves = get_safe_moves(game_state, maximizing)
 
     def getChildren(self):
+        children = []
         for safe_move in self.safe_moves:
+            node_value = get_state_value(
+                self.game_state, safe_move, self.maximizing)
             new_game_state = apply_move(self.game_state,
-                                        safe_move)
-        if new_game_state is not None:
-            yield GameStateNode(new_game_state, not self.maximizing, safe_move)
+                                        safe_move, self.maximizing)
+            children.append(GameStateNode(
+                new_game_state, node_value,
+                not self.maximizing, safe_move))
+        return children
 
-    def is_terminal(self):
-        my_snake = self.game_state['you']
-        head = my_snake['body'][0]
-
-        # Check for collision with walls
-        board_width = self.game_state['board']['width']
-        board_height = self.game_state['board']['height']
-        if head['x'] < 0 or head['x'] >= board_width or head['y'] < 0 or head['y'] >= board_height:
-            return True  # The snake has collided with a wall
-
-        # Check for self-collision
-        if head in my_snake['body'][1:]:
-            return True  # The snake has collided with itself
-
-        # Check for collisions with other snakes
-        for snake in self.game_state['board']['snakes']:
-            if snake['id'] != my_snake['id'] and head in snake['body']:
-                return True  # The snake has collided with another snake
-
-        # Additional terminal conditions can be checked here, e.g., winning conditions
-
-        return False  # If none of the terminal conditions are met, the game is not in a terminal state
-
+    def getLocation(self):
+        snake = get_correct_snake(self.game_state, self.maximizing)
+        return snake["head"]["x"], snake["head"]["y"]
 
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
-    if depth == 0 or node.is_terminal():
-        return get_state_value(node.game_state, maximizingPlayer), node.move
+    print("\t"*(3-depth), node.maximizing,
+          node.getLocation(), depth, node.value, node.move)
+
+    children = node.getChildren()
+
+    if depth == 0 or not children:
+        return node.value, node.move
 
     if maximizingPlayer:
         value = float('-inf')
         best_move = None
-        for child in node.getChildren():
+        for child in children:
             child_value, _ = alphabeta(child, depth-1, alpha, beta, False)
             if child_value > value:
                 value = child_value
@@ -360,7 +325,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     else:
         value = float('inf')
         best_move = None
-        for child in node.getChildren():
+        for child in children:
             child_value, _ = alphabeta(child, depth-1, alpha, beta, True)
             if child_value < value:
                 value = child_value
@@ -369,87 +334,34 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             if beta <= alpha:
                 break  # Alpha cut-off
         return value, best_move
-def detect_loop(history):
-    # Simple example: check if the last N moves are repeating
-    N = 12  # Size of pattern to check for; adjust based on observed loops
-    if len(history) >= N * 2:
-        return history[-N:] == history[-(N*2):-N]
-    return False
 
-def break_loop(safe_moves):
-    # Choose a move to break the loop, maybe the least used move,
-    # or random if safe_moves is not empty
-    return safe_moves[random.randint(0, len(safe_moves)-1)] if safe_moves else 'up'
+
 # move is called on every turn and returns your next move
 # Valid moves are "up", "down", "left", or "right"
 # See https://docs.battlesnake.com/api/example-move for available data
 def move(game_state: typing.Dict) -> typing.Dict:
-    global move_history
+    # print(json.dumps(game_state, indent=4))
+
+    if len(game_state["board"]["snakes"]) == 1:
+        return {"move": "down"}
 
     safe_moves = get_safe_moves(game_state, True)
 
     if not safe_moves:
-        return {"move":"up"}
+        print(f"MOVE {game_state['turn']}: No safe moves. Moving down.")
+        return {"move": "down"}
 
-    if detect_loop(move_history):
-        print("break loop")
-        next_move = break_loop(safe_moves)
-    else:
-        origin = GameStateNode(game_state)
-        depth = 25
+    origin = GameStateNode(game_state)
+    depth = 1
 
-        alpha = float('-inf')
-        beta = float('inf')
-        next_move_value, next_move = alphabeta(origin,depth,alpha,beta,True)
-
-    if next_move not in safe_moves:
-        next_move = safe_moves[0]
-
-    move_history.append(next_move)
-
-    if len(move_history) > 100:
-        move_history.pop(0)
+    alpha = float('-inf')
+    beta = float('inf')
+    next_move_value, next_move = alphabeta(
+        origin, depth, alpha, beta, True)
 
     print(f"MOVE {game_state['turn']}: {next_move}")
 
     return {"move": next_move}
-    # TODO: Integrate the below inaccessable code as part of get_state_value
-
-    # Step 4 - Move towards food instead of random,
-    # to regain health and survive longer
-    food = game_state['board']['food']
-
-    # Temporarily duplicating these variables as this system will be removed
-    my_head = game_state["you"]["body"][0]  # Coordinates of your head
-    surrounding_cells = {
-        'left': {'x': my_head['x'] - 1, 'y': my_head['y']},
-        'right': {'x': my_head['x'] + 1, 'y': my_head['y']},
-        'up': {'x': my_head['x'], 'y': my_head['y'] + 1},
-        'down': {'x': my_head['x'], 'y': my_head['y'] - 1}
-    }
-
-    food_dist = []
-
-    for f in food:
-        f_dist = distance(my_head['x'], my_head['y'], f['x'], f['y'])
-        food_dist.append((f, f_dist))
-
-    def sort_dist(t):
-        return t[1]
-
-    food_dist.sort(key=sort_dist)
-
-    safe_dist = []
-
-    for safe_move in safe_moves:
-        sx = surrounding_cells[safe_move]['x']
-        sy = surrounding_cells[safe_move]['y']
-        s_dist = distance(sx, sy, food_dist[0][0]['x'], food_dist[0][0]['y'])
-        safe_dist.append((safe_move, s_dist))
-
-    safe_dist.sort(key=sort_dist)
-
-    next_move = safe_dist[0][0]
 
 
 # Start server when `python main.py` is run
