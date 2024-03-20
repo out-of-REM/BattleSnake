@@ -6,7 +6,6 @@
 #  |________/(______/__|  |__| |____/\_____>______>___|__(______/__|__\\_____>
 #
 # This file can be a nice home for your Battlesnake logic and helper functions.
-#
 # For more info see docs.battlesnake.com
 
 import typing
@@ -24,27 +23,23 @@ def info() -> typing.Dict:
 
     return {
         "apiversion": "1",
-        "author": "",  # TODO: Your Battlesnake Username
+        "author": "SalazarSlytherin",  # TODO: Your Battlesnake Username
         "color": "#888888",  # TODO: Choose color
         "head": "default",  # TODO: Choose head
         "tail": "default",  # TODO: Choose tail
     }
 
-
 # start is called when your Battlesnake begins a game
 def start(game_state: typing.Dict):
     print("GAME START")
-
 
 # end is called when your Battlesnake finishes a game
 def end(game_state: typing.Dict):
     print("GAME OVER\n")
 
-
 # distance helper function
 def distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-
 
 def get_safe_moves(game_state, maximizing):
     # TODO: Change snake depending on maximizing value
@@ -97,12 +92,10 @@ def get_safe_moves(game_state, maximizing):
 
     return safe_moves
 
-
 def apply_move(game_state, move):
     # Create a deep copy of the game state to simulate the move without affecting the original state
     new_game_state = copy.deepcopy(game_state)
     my_snake = new_game_state['you']
-    
 
     # Calculate new head position
     head = my_snake['body'][0]
@@ -141,7 +134,6 @@ def apply_move(game_state, move):
 
     return new_game_state
 
-
 def get_state_value(game_state,maximizing):
     value = 0
     my_snake = game_state['you']
@@ -169,7 +161,6 @@ def get_state_value(game_state,maximizing):
             opponent_length = len(snake['body'])
             distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
         
-
             # Prioritize getting closer to smaller snakes
             if my_length > opponent_length:
                 # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
@@ -182,6 +173,7 @@ def get_state_value(game_state,maximizing):
     #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
     #points it in the direction of the food.
     return value
+
 def generate_neighbors(current, game_state):
     neighbors = []
     directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Up, Down, Left, Right movements
@@ -207,7 +199,6 @@ def generate_neighbors(current, game_state):
                 neighbors.append(neighbor)
 
     return neighbors
-
 
 def a_star_pathfinding(start, goal, game_state):
     # Heuristic function (Manhattan distance for a grid)
@@ -254,7 +245,6 @@ def a_star_pathfinding(start, goal, game_state):
     
     return []  # If there's no path to the goal
 
-
 def get_state_value(game_state,maximizing):
     value = 0
     my_snake = game_state['you']
@@ -266,7 +256,6 @@ def get_state_value(game_state,maximizing):
     # Base value on health - less aggressive approach but necessary for survival
     value += my_snake['health']
 
-
     for food in food_positions:
         path = a_star_pathfinding(my_head,food,game_state)
         if path:
@@ -274,13 +263,9 @@ def get_state_value(game_state,maximizing):
 
     if shortest_path_length != float('inf'):
         value +=100 - (shortest_path_length * 10)
-    
-  
 
     # Aggressiveness factor
     aggression_multiplier = 10  # Adjust this value to tweak aggressiveness
-
-  
 
     for snake in game_state['board']['snakes']:
         if snake['id'] != my_snake['id']:
@@ -288,14 +273,27 @@ def get_state_value(game_state,maximizing):
             opponent_length = len(snake['body'])
             distance_to_opponent = abs(my_head['x'] - opponent_head['x']) + abs(my_head['y'] - opponent_head['y'])
 
+            opponent_head_zone = [
+                {'x': opponent_head['x'] - 1, 'y': opponent_head['y']},
+                {'x': opponent_head['x'] + 1, 'y': opponent_head['y']},
+                {'x': opponent_head['x'], 'y': opponent_head['y'] + 1},
+                {'x': opponent_head['x'], 'y': opponent_head['y'] - 1}
+            ]
+
             # Prioritize getting closer to smaller snakes
             if my_length > opponent_length:
                 # Inverse of distance to make closer snakes have higher value, multiplied by aggressiveness factor
                 value += (10 - distance_to_opponent) * aggression_multiplier
-            
+                # If stepping into opponent head zone while opponent is smaller, increase value
+                if my_head in opponent_head_zone:
+                    value += (my_length - opponent_length) * aggression_multiplier
+
             # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
-            if my_length <= opponent_length:
+            elif my_length <= opponent_length:
                 value -= (10 - distance_to_opponent) * aggression_multiplier
+                # If stepping into opponent head zone while opponent is smaller, decrease value to almost nothing
+                if my_head in opponent_head_zone:
+                    value = 1
 
     #TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that 
     #points it in the direction of the food. There is a issue that needs to be addressed due to looping.
@@ -339,8 +337,6 @@ class GameStateNode():
 
         return False  # If none of the terminal conditions are met, the game is not in a terminal state
 
-
-
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     if depth == 0 or node.is_terminal():
         return get_state_value(node.game_state, maximizingPlayer), node.move
@@ -369,6 +365,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             if beta <= alpha:
                 break  # Alpha cut-off
         return value, best_move
+
 def detect_loop(history):
     # Simple example: check if the last N moves are repeating
     N = 12  # Size of pattern to check for; adjust based on observed loops
@@ -380,6 +377,7 @@ def break_loop(safe_moves):
     # Choose a move to break the loop, maybe the least used move,
     # or random if safe_moves is not empty
     return safe_moves[random.randint(0, len(safe_moves)-1)] if safe_moves else 'up'
+
 # move is called on every turn and returns your next move
 # Valid moves are "up", "down", "left", or "right"
 # See https://docs.battlesnake.com/api/example-move for available data
@@ -450,7 +448,6 @@ def move(game_state: typing.Dict) -> typing.Dict:
     safe_dist.sort(key=sort_dist)
 
     next_move = safe_dist[0][0]
-
 
 # Start server when `python main.py` is run
 if __name__ == "__main__":
