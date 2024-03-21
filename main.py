@@ -220,7 +220,8 @@ def get_state_value(game_state, move, maximizing):
         my_head['x'] += 1
 
     my_snake['body'].insert(0, copy.deepcopy(my_head))
-    my_snake['body'].pop()
+    if (move != None):
+        my_snake['body'].pop()
 
     my_length = len(my_snake['body'])
     food_positions = game_state['board']['food']
@@ -230,9 +231,12 @@ def get_state_value(game_state, move, maximizing):
     value += my_snake['health']
 
     for food in food_positions:
-        path = a_star_pathfinding(my_head, food, game_state)
-        if path:
-            shortest_path_length = min(shortest_path_length, len(path))
+        if my_head == food:
+            shortest_path_length = 0
+        else:
+            path = a_star_pathfinding(my_head, food, game_state)
+            if path:
+                shortest_path_length = min(shortest_path_length, len(path))
 
     if shortest_path_length != float('inf'):
         value += 100 - (shortest_path_length * 10)
@@ -263,14 +267,12 @@ def get_state_value(game_state, move, maximizing):
                     value += (my_length - opponent_length) * aggression_multiplier
 
             # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
-            if my_length <= opponent_length:
+            elif my_length < opponent_length:
                 value -= (10 - distance_to_opponent) * aggression_multiplier
-                # If stepping into opponent head zone while opponent is smaller, decrease value to almost nothing (near-certain death awaits)
+                # If stepping into opponent head zone while opponent is smaller, decrease value to nothing (near-certain death awaits)
                 if my_head in opponent_head_zone:
-                    value = 1
+                    value = float('-inf')
 
-    # TODO we need to implement a pathfinding algorithm, something to remember the history and penalize repeated moves or something that
-    # points it in the direction of the food.
     if maximizing:
         return value
     else:
@@ -287,13 +289,9 @@ class GameStateNode():
     def getChildren(self):
         children = []
         for safe_move in self.safe_moves:
-            node_value = get_state_value(
-                self.game_state, safe_move, self.maximizing)
-            new_game_state = apply_move(self.game_state,
-                                        safe_move, self.maximizing)
-            children.append(GameStateNode(
-                new_game_state, node_value,
-                not self.maximizing, safe_move))
+            node_value = get_state_value(self.game_state, safe_move, self.maximizing)
+            new_game_state = apply_move(self.game_state, safe_move, self.maximizing)
+            children.append(GameStateNode(new_game_state, node_value, not self.maximizing, safe_move))
         return children
 
     def getLocation(self):
@@ -301,8 +299,7 @@ class GameStateNode():
         return snake["head"]["x"], snake["head"]["y"]
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
-    print("\t"*(3-depth), node.maximizing,
-          node.getLocation(), depth, node.value, node.move)
+    #print("\t"*(3-depth), node.maximizing, node.getLocation(), depth, node.value, node.move)
 
     children = node.getChildren()
 
@@ -314,24 +311,28 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
         best_move = None
         for child in children:
             child_value, _ = alphabeta(child, depth-1, alpha, beta, False)
+            child_value += node.value
             if child_value > value:
                 value = child_value
                 best_move = child.move
             alpha = max(alpha, value)
             if alpha >= beta:
                 break  # Beta cut-off
+        #print("\t"*(3-depth), "returning: ", value, best_move)
         return value, best_move
     else:
         value = float('inf')
         best_move = None
         for child in children:
             child_value, _ = alphabeta(child, depth-1, alpha, beta, True)
+            child_value += node.value
             if child_value < value:
                 value = child_value
                 best_move = child.move
             beta = min(beta, value)
             if beta <= alpha:
                 break  # Alpha cut-off
+        #print("\t"*(3-depth), "returning: ", value, best_move)
         return value, best_move
 
 # move is called on every turn and returns your next move
@@ -347,8 +348,8 @@ def move(game_state: typing.Dict) -> typing.Dict:
         print(f"MOVE {game_state['turn']}: No safe moves. Moving down.")
         return {"move": "down"}
 
-    origin = GameStateNode(game_state)
-    depth = 1
+    origin = GameStateNode(game_state, value=get_state_value(game_state, None, True))
+    depth = 2
     alpha = float('-inf')
     beta = float('inf')
     next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
@@ -365,5 +366,4 @@ if __name__ == "__main__":
         if sys.argv[i] == '--port':
             port = sys.argv[i+1]
 
-    run_server({"info": info, "start": start,
-               "move": move, "end": end, "port": port})
+    run_server({"info": info, "start": start, "move": move, "end": end, "port": port})
