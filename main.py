@@ -338,8 +338,6 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
 # Valid moves are "up", "down", "left", or "right"
 # See https://docs.battlesnake.com/api/example-move for available data
 def move(game_state: typing.Dict) -> typing.Dict:
-    # print(json.dumps(game_state, indent=4))
-
     if len(game_state["board"]["snakes"]) == 1:
         return {"move": "down"}
 
@@ -351,11 +349,9 @@ def move(game_state: typing.Dict) -> typing.Dict:
 
     origin = GameStateNode(game_state)
     depth = 1
-
     alpha = float('-inf')
     beta = float('inf')
-    next_move_value, next_move = alphabeta(
-        origin, depth, alpha, beta, True)
+    next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
 
     print(f"MOVE {game_state['turn']}: {next_move}")
 
