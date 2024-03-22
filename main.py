@@ -74,8 +74,10 @@ def get_safe_moves(game_state, maximizing):
 
     # Step 2 - Prevent your Battlesnake from colliding with itself
     # Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
-    # Snakes include our snake, and collisions include going backwards, hence satifying step 2.
-    snakes = game_state['board']['snakes']
+    # Opponents include our snake, therefore satifying step 2.
+    # Since our snake's body includes its neck,
+    # this also satifies not going backwards.
+    opponents = game_state['board']['snakes']
 
     surrounding_cells = {
         'left': {'x': my_head['x'] - 1, 'y': my_head['y']},
@@ -84,9 +86,9 @@ def get_safe_moves(game_state, maximizing):
         'down': {'x': my_head['x'], 'y': my_head['y'] - 1}
     }
 
-    for snake in snakes:
+    for opponent in opponents:
         for direction, cell in surrounding_cells.items():
-            if cell in snake['body']:
+            if cell in opponent['body']:
                 is_move_safe[direction] = False
 
     # Are there any safe moves left?
@@ -96,6 +98,7 @@ def get_safe_moves(game_state, maximizing):
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
+        print(f"""MOVE {game_state['turn']} {maximizing}: No safe moves detected! Moving down""")
         return ["down"]
 
     return safe_moves
@@ -121,12 +124,12 @@ def apply_move(game_state, move, maximizing):
     # Simulate eating food
     if head in new_game_state['board']['food']:
         # Snake grows; don't remove tail in this move
-        my_snake['body'].insert(0, copy.deepcopy(head))
+        my_snake['body'].insert(0, {"x": head["x"], "y": head["y"]})
         new_game_state['board']['food'] = [food for food in new_game_state['board']
                                            ['food'] if not (food['x'] == head['x'] and food['y'] == head['y'])]
     else:
         # Move snake forward by inserting a copy of the new head location
-        my_snake['body'].insert(0, copy.deepcopy(head))
+        my_snake['body'].insert(0, {"x": head["x"], "y": head["y"]})
         my_snake['body'].pop()
 
     return new_game_state
@@ -138,15 +141,22 @@ def distance(x1, y1, x2, y2):
 
 
 def get_state_value(game_state, move, maximizing):
-    # The max/min float values are always less than/greater than their respective infinities
-    #   while still being "infinity", they are larger or smaller than any calculatable value
+    # The max/min float values are always less than/greater then
+    # their respective infinities, while still being "infinity"
+    # larger or smaller than any value possibly calculatable
+    infinity = 0
     if maximizing:
         infinity = sys.float_info.max
     else:
         infinity = -sys.float_info.max
     value = 0
-    my_snake = copy.deepcopy(get_correct_snake(game_state, maximizing))
-    my_head = my_snake['body'][0]
+    my_current_snake = get_correct_snake(game_state, maximizing)
+    my_snake = {
+        "id": my_current_snake["id"],
+        "body": [{"x": s["x"], "y": s["y"]} for s in my_current_snake["body"]],
+        "head": {"x": my_current_snake["head"]["x"], "y": my_current_snake["head"]["y"]}
+    }
+    my_head = my_snake['head']
 
     if move == 'up':
         my_head['y'] += 1
@@ -157,13 +167,14 @@ def get_state_value(game_state, move, maximizing):
     elif move == 'right':
         my_head['x'] += 1
 
-    my_snake['body'].insert(0, copy.deepcopy(my_head))
+    my_snake['body'].insert(0, {"x": my_head["x"], "y": my_head["y"]})
     if (move != None):
         my_snake['body'].pop()
 
     my_length = len(my_snake['body'])
-    
+
     food = game_state['board']['food']
+
     food_dist = []
 
     for f in food:
@@ -192,16 +203,22 @@ def get_state_value(game_state, move, maximizing):
                 {'x': opponent_head['x'], 'y': opponent_head['y'] - 1}
             ]
 
-            # If stepping into squares where a head-to-head collision is possible
-            if my_head in opponent_head_zone:
-                # If larger than opponent, imminent win: set value to highest possible
-                if my_length > opponent_length:
+            # Prioritize getting closer to smaller snakes
+            if my_length > opponent_length:
+                # If stepping into opponent head zone while opponent is smaller, increase value
+                if my_head in opponent_head_zone:
                     value = infinity
-                elif my_length < opponent_length:
-                # If smaller than opponent, imminent death: set value to lowest possible
+
+            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
+            elif my_length <= opponent_length:
+                # If stepping into opponent head zone while opponent is smaller, decrease value to nothing (near-certain death awaits)
+                if my_head in opponent_head_zone:
                     value = -infinity
 
-    return value if maximizing else -value
+    if maximizing:
+        return value
+    else:
+        return -value
 
 
 class GameStateNode():
@@ -226,6 +243,8 @@ class GameStateNode():
 
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
+    # print("\t"*(7-depth), node.maximizing, node.getLocation(), depth, node.value, node.move)
+
     children = node.getChildren()
 
     if depth == 0 or not children:
@@ -243,6 +262,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             alpha = max(alpha, value)
             if alpha >= beta:
                 break  # Beta cut-off
+        # print("\t"*(7-depth), "returning: ", value, best_move)
         return value, best_move
     else:
         value = float('inf')
@@ -256,6 +276,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             beta = min(beta, value)
             if beta <= alpha:
                 break  # Alpha cut-off
+        # print("\t"*(7-depth), "returning: ", value, best_move)
         return value, best_move
 
 
@@ -273,7 +294,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
         return {"move": "down"}
 
     origin = GameStateNode(game_state, value=get_state_value(game_state, None, True))
-    depth = 5
+    depth = 7
     alpha = float('-inf')
     beta = float('inf')
     next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
