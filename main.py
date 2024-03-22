@@ -74,10 +74,8 @@ def get_safe_moves(game_state, maximizing):
 
     # Step 2 - Prevent your Battlesnake from colliding with itself
     # Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
-    # Opponents include our snake, therefore satifying step 2.
-    # Since our snake's body includes its neck,
-    # this also satifies not going backwards.
-    opponents = game_state['board']['snakes']
+    # Snakes include our snake, and collisions include going backwards, hence satifying step 2.
+    snakes = game_state['board']['snakes']
 
     surrounding_cells = {
         'left': {'x': my_head['x'] - 1, 'y': my_head['y']},
@@ -86,9 +84,9 @@ def get_safe_moves(game_state, maximizing):
         'down': {'x': my_head['x'], 'y': my_head['y'] - 1}
     }
 
-    for opponent in opponents:
+    for snake in snakes:
         for direction, cell in surrounding_cells.items():
-            if cell in opponent['body']:
+            if cell in snake['body']:
                 is_move_safe[direction] = False
 
     # Are there any safe moves left?
@@ -98,7 +96,6 @@ def get_safe_moves(game_state, maximizing):
             safe_moves.append(move)
 
     if len(safe_moves) == 0:
-        print(f"""MOVE {game_state['turn']} {maximizing}: No safe moves detected! Moving down""")
         return ["down"]
 
     return safe_moves
@@ -141,10 +138,8 @@ def distance(x1, y1, x2, y2):
 
 
 def get_state_value(game_state, move, maximizing):
-    # The max/min float values are always less than/greater then
-    # their respective infinities, while still being "infinity"
-    # larger or smaller than any value possibly calculatable
-    infinity = 0
+    # The max/min float values are always less than/greater than their respective infinities
+    #   while still being "infinity", they are larger or smaller than any calculatable value
     if maximizing:
         infinity = sys.float_info.max
     else:
@@ -167,9 +162,8 @@ def get_state_value(game_state, move, maximizing):
         my_snake['body'].pop()
 
     my_length = len(my_snake['body'])
-
+    
     food = game_state['board']['food']
-
     food_dist = []
 
     for f in food:
@@ -198,22 +192,16 @@ def get_state_value(game_state, move, maximizing):
                 {'x': opponent_head['x'], 'y': opponent_head['y'] - 1}
             ]
 
-            # Prioritize getting closer to smaller snakes
-            if my_length > opponent_length:
-                # If stepping into opponent head zone while opponent is smaller, increase value
-                if my_head in opponent_head_zone:
+            # If stepping into squares where a head-to-head collision is possible
+            if my_head in opponent_head_zone:
+                # If larger than opponent, imminent win: set value to highest possible
+                if my_length > opponent_length:
                     value = infinity
-
-            # Penalize getting too close to bigger snakes unless you have a strategy to deal with them
-            elif my_length <= opponent_length:
-                # If stepping into opponent head zone while opponent is smaller, decrease value to nothing (near-certain death awaits)
-                if my_head in opponent_head_zone:
+                elif my_length < opponent_length:
+                # If smaller than opponent, imminent death: set value to lowest possible
                     value = -infinity
 
-    if maximizing:
-        return value
-    else:
-        return -value
+    return value if maximizing else -value
 
 
 class GameStateNode():
@@ -238,8 +226,6 @@ class GameStateNode():
 
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
-    # print("\t"*(7-depth), node.maximizing, node.getLocation(), depth, node.value, node.move)
-
     children = node.getChildren()
 
     if depth == 0 or not children:
@@ -257,7 +243,6 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             alpha = max(alpha, value)
             if alpha >= beta:
                 break  # Beta cut-off
-        # print("\t"*(7-depth), "returning: ", value, best_move)
         return value, best_move
     else:
         value = float('inf')
@@ -271,7 +256,6 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             beta = min(beta, value)
             if beta <= alpha:
                 break  # Alpha cut-off
-        # print("\t"*(7-depth), "returning: ", value, best_move)
         return value, best_move
 
 
@@ -289,7 +273,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
         return {"move": "down"}
 
     origin = GameStateNode(game_state, value=get_state_value(game_state, None, True))
-    depth = 7
+    depth = 5
     alpha = float('-inf')
     beta = float('inf')
     next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
