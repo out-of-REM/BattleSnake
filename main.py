@@ -137,10 +137,13 @@ def distance(x1, y1, x2, y2):
     return abs(x1 - x2) + abs(y1 - y2)
 
 
+# Assign a value greater than/less than anything that get_state_value can calculate
+# to stand in for infinity to avoid problems in alphabeta
+infinity = 1000
+
+
 def get_state_value(game_state, move, maximizing):
-    # The max/min float values are always less than/greater than their respective infinities
-    #   while still being "infinity", they are larger or smaller than any calculatable value
-    infinity = sys.float_info.max
+    global infinity
     my_snake = get_correct_snake(game_state, True)
     other_snake = get_correct_snake(game_state, False)
     my_snake_copy = {
@@ -204,12 +207,12 @@ def get_state_value(game_state, move, maximizing):
     if not my_food_dist:
         my_value = infinity
     else:
-        my_value = 22 - my_food_dist[0][1]
+        my_value = (2 / (my_food_dist[0][1] + 1)) * 100
 
     if not other_food_dist:
         other_value = infinity
     else:
-        other_value = 22 - other_food_dist[0][1]
+        other_value = (1 / (other_food_dist[0][1] + 1)) * 100
 
     value = my_value - other_value
 
@@ -230,8 +233,9 @@ def get_state_value(game_state, move, maximizing):
                 # If larger than opponent, imminent win: set value to highest possible
                 if my_length > opponent_length:
                     value = infinity
-                elif my_length < opponent_length:
+                elif my_length <= opponent_length:
                 # If smaller than opponent, imminent death: set value to lowest possible
+                # We also avoid equal collisions since draws are basically losses also
                     value = -infinity
 
     return value
@@ -259,10 +263,19 @@ class GameStateNode():
 
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
-    print("\t"*(2-depth), node.maximizing, node.getLocation(), depth, node.value, node.move)
+    global infinity
+    # print("\t"*(7-depth), node.maximizing, depth, node.getLocation(), node.value, node.move)
     children = node.getChildren()
 
-    if depth == 0 or not children:
+    is_terminal = False
+
+    if maximizingPlayer and node.value == infinity:
+        is_terminal = True
+
+    if not maximizingPlayer and node.value == -infinity:
+        is_terminal = True
+
+    if depth == 0 or not children or is_terminal:
         return node.value, node.move
 
     if maximizingPlayer:
@@ -276,7 +289,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             alpha = max(alpha, value)
             if alpha >= beta:
                 break  # Beta cut-off
-        print("\t"*(2-depth), "returning: ", value, best_move)
+        # print("\t"*(7-depth), "returning", depth, value, best_move)
         return value, best_move
     else:
         value = float('inf')
@@ -289,7 +302,7 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             beta = min(beta, value)
             if beta <= alpha:
                 break  # Alpha cut-off
-        print("\t"*(2-depth), "returning: ", value, best_move)
+        # print("\t"*(7-depth), "returning", depth, value, best_move)
         return value, best_move
 
 
@@ -307,7 +320,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
         return {"move": "down"}
 
     origin = GameStateNode(game_state, value=get_state_value(game_state, None, True))
-    depth = 1
+    depth = 7
     alpha = float('-inf')
     beta = float('inf')
     next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
