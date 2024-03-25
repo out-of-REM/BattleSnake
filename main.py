@@ -15,10 +15,12 @@ import copy
 import json
 import sys
 
+# Assign a value greater than/less than anything that get_state_value can calculate
+# to stand in for infinity to avoid problems in alphabeta
+infinity = 1000
+
 # info is called when you create your Battlesnake on play.battlesnake.com and controls your Battlesnake's appearance
 # TIP: If you open your Battlesnake URL in a browser you should see this data
-
-
 def info() -> typing.Dict:
     print("INFO")
 
@@ -137,11 +139,6 @@ def distance(x1, y1, x2, y2):
     return abs(x1 - x2) + abs(y1 - y2)
 
 
-# Assign a value greater than/less than anything that get_state_value can calculate
-# to stand in for infinity to avoid problems in alphabeta
-infinity = 1000
-
-
 def get_state_value(game_state, move, maximizing):
     global infinity
     my_snake = get_correct_snake(game_state, True)
@@ -207,12 +204,12 @@ def get_state_value(game_state, move, maximizing):
     if not my_food_dist:
         my_value = infinity
     else:
-        my_value = (2 / (my_food_dist[0][1] + 1)) * 100
+        my_value = 200 / (my_food_dist[0][1] + 1)
 
     if not other_food_dist:
         other_value = infinity
     else:
-        other_value = (1 / (other_food_dist[0][1] + 1)) * 100
+        other_value = 100 / (other_food_dist[0][1] + 1)
 
     value = my_value - other_value
 
@@ -264,7 +261,6 @@ class GameStateNode():
 
 def alphabeta(node, depth, alpha, beta, maximizingPlayer):
     global infinity
-    # print("\t"*(7-depth), node.maximizing, depth, node.getLocation(), node.value, node.move)
     children = node.getChildren()
 
     is_terminal = False
@@ -289,7 +285,6 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             alpha = max(alpha, value)
             if alpha >= beta:
                 break  # Beta cut-off
-        # print("\t"*(7-depth), "returning", depth, value, best_move)
         return value, best_move
     else:
         value = float('inf')
@@ -302,7 +297,6 @@ def alphabeta(node, depth, alpha, beta, maximizingPlayer):
             beta = min(beta, value)
             if beta <= alpha:
                 break  # Alpha cut-off
-        # print("\t"*(7-depth), "returning", depth, value, best_move)
         return value, best_move
 
 
@@ -320,10 +314,7 @@ def move(game_state: typing.Dict) -> typing.Dict:
         return {"move": "down"}
 
     origin = GameStateNode(game_state, value=get_state_value(game_state, None, True))
-    depth = 7
-    alpha = float('-inf')
-    beta = float('inf')
-    next_move_value, next_move = alphabeta(origin, depth, alpha, beta, True)
+    next_move_value, next_move = alphabeta(origin, 1, float('-inf'), float('inf'), True)
 
     print(f"MOVE {game_state['turn']}: {next_move}")
 
